@@ -144,6 +144,14 @@ if st.button("🚀 Start Processing", type="primary"):
             }
         },
     }
+
+    # === COOKIES SUPPORT (paling ampuh bypass 403) ===
+    cookies_path = "cookies.txt"
+    if os.path.exists(cookies_path):
+        ydl_opts["cookiefile"] = cookies_path
+        st.info("🍪 Menggunakan cookies.txt")
+    else:
+        st.warning("⚠️ Tidak ada cookies.txt. Bisa kena 403. Cara buat cookies.txt ada di README.")
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
