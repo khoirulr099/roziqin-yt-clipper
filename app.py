@@ -4,6 +4,10 @@ import subprocess
 import json
 from pathlib import Path
 
+# Force upgrade yt-dlp BEFORE importing (penting untuk Streamlit Cloud)
+subprocess.run([sys.executable, "-m", "pip", "install", "-U", "yt-dlp"], 
+               capture_output=True)
+
 import streamlit as st
 import yt_dlp
 
@@ -118,10 +122,6 @@ if st.button("🚀 Start Processing", type="primary"):
     # Download
     st.info(f"📥 Downloading ({quality_choice})...")
 
-    # Force update yt-dlp (important for Streamlit Cloud)
-    import subprocess
-    subprocess.run([sys.executable, "-m", "pip", "install", "-U", "yt-dlp"], check=True)
-
     ydl_opts = {
         "format": format_selector,
         "outtmpl": "downloads/%(title)s.%(ext)s",
@@ -140,8 +140,7 @@ if st.button("🚀 Start Processing", type="primary"):
         "sleep_interval_requests": 1,
         "extractor_args": {
             "youtube": {
-                "player_client": ["ios", "web_safari", "web_embedded", "web"],
-                "player_skip": ["configs", "js", "dash", "hls"],
+                "player_client": ["ios", "mweb", "tv_embedded", "web"],
             }
         },
     }
