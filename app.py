@@ -125,15 +125,15 @@ if st.button("🚀 Start Processing", type="primary"):
             "Accept-Language": "en-US,en;q=0.9",
             "Referer": "https://www.youtube.com/",
             "Origin": "https://www.youtube.com",
+            "Accept-Encoding": "gzip, deflate, br",
         },
         "nocheckcertificate": True,
         "quiet": False,
         "no_warnings": True,
-        "impersonate": "chrome",
         "sleep_interval_requests": 1,
         "extractor_args": {
             "youtube": {
-                "player_client": ["ios", "web_safari", "web_embedded"],
+                "player_client": ["ios", "web_safari", "web_embedded", "web"],
                 "player_skip": ["configs", "js", "dash", "hls"],
             }
         },
