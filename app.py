@@ -1,5 +1,7 @@
 import os
+import sys
 import subprocess
+import json
 from pathlib import Path
 
 import streamlit as st
@@ -115,6 +117,11 @@ if st.button("🚀 Start Processing", type="primary"):
 
     # Download
     st.info(f"📥 Downloading ({quality_choice})...")
+
+    # Force update yt-dlp (important for Streamlit Cloud)
+    import subprocess
+    subprocess.run([sys.executable, "-m", "pip", "install", "-U", "yt-dlp"], check=True)
+
     ydl_opts = {
         "format": format_selector,
         "outtmpl": "downloads/%(title)s.%(ext)s",
