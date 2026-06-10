@@ -124,13 +124,15 @@ if st.button("🚀 Start Processing", type="primary"):
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.9",
             "Referer": "https://www.youtube.com/",
+            "Origin": "https://www.youtube.com",
         },
         "nocheckcertificate": True,
         "quiet": False,
         "no_warnings": True,
+        "sleep_interval_requests": 1,
         "extractor_args": {
             "youtube": {
-                "player_client": ["android", "web"],
+                "player_client": ["ios", "android", "web"],
                 "player_skip": ["configs", "js"],
             }
         },
