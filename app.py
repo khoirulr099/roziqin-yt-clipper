@@ -122,10 +122,21 @@ if st.button("🚀 Start Processing", type="primary"):
     # Download
     st.info(f"📥 Downloading ({quality_choice})...")
 
+    # Write cookies dari Streamlit Secrets ke file sementara
+    cookies_path = None
+    try:
+        if "youtube" in st.secrets and "cookies" in st.secrets["youtube"]:
+            cookies_path = "/tmp/yt_cookies.txt"
+            with open(cookies_path, "w") as f:
+                f.write(st.secrets["youtube"]["cookies"])
+    except Exception:
+        pass
+
     ydl_opts = {
         "format": format_selector,
         "outtmpl": "downloads/%(title)s.%(ext)s",
         "merge_output_format": "mp4",
+        "cookiefile": cookies_path,
         "http_headers": {
             "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
@@ -144,14 +155,6 @@ if st.button("🚀 Start Processing", type="primary"):
             }
         },
     }
-
-    # === COOKIES SUPPORT (paling ampuh bypass 403) ===
-    cookies_path = "cookies.txt"
-    if os.path.exists(cookies_path):
-        ydl_opts["cookiefile"] = cookies_path
-        st.info("🍪 Menggunakan cookies.txt")
-    else:
-        st.warning("⚠️ Tidak ada cookies.txt. Bisa kena 403. Cara buat cookies.txt ada di README.")
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
