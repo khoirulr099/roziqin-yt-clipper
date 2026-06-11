@@ -52,8 +52,8 @@ Thumbs.db
 *.log
 # Windows null file
 nul
-Thumbs.db
-ehthumbs.db
-last_chat_id.txt
 
-users.json
+# Cookies (sangat sensitif - jangan di-push ke GitHub)
+cookies.txt
+cookies/
+last_chat_id.txt
