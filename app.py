@@ -78,9 +78,14 @@ def convert_vertical(src, out):
     return ok, err
 
 def convert_tracking(src, out):
+    # Crop 10% tepi sebagai buffer stabilisasi — no external library needed
     ok, err = run_ffmpeg([
         "ffmpeg", "-y", "-i", src,
-        "-vf", "deshake,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
+        "-vf", (
+            "crop=iw*0.9:ih*0.9,"
+            "scale=1080:1920:force_original_aspect_ratio=increase,"
+            "crop=1080:1920"
+        ),
         "-c:v", "libx264", "-preset", "fast", "-crf", "23",
         "-c:a", "aac", "-b:a", "128k",
         "-movflags", "+faststart",
@@ -112,7 +117,6 @@ def build_format_selector(quality):
 
 # ==================== PAGE CONFIG ====================
 st.set_page_config(page_title="Roziqin YT Clipper", layout="wide", page_icon="✂️")
-
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap');
@@ -198,9 +202,9 @@ if mode == "Manual Mode" and url:
                 st.error("End harus lebih besar dari Start")
 
         if st.session_state.get("manual_clips"):
-            st.write(f"**{len(st.session_state.manual_clips)} clips** added:")
+            st.write(f"{len(st.session_state.manual_clips)} clips added:")
             for i, c in enumerate(st.session_state.manual_clips):
-                st.write(f"{i+1}. `{c['start']}s` → `{c['end']}s` ({c['duration']}s)")
+                st.write(f"{i+1}. {c['start']}s → {c['end']}s ({c['duration']}s)")
             if st.button("🗑️ Reset All"):
                 st.session_state.manual_clips = []
                 st.rerun()
@@ -223,16 +227,14 @@ if st.button("🚀 Start Processing", type="primary", use_container_width=True):
     format_selector = build_format_selector(quality_choice)
 
     with st.status("📥 Downloading video...", expanded=True) as dl_status:
-        st.write(f"Format: `{quality_choice}` — mencari stream terbaik...")
-
+        st.write(f"Format: {quality_choice} — mencari stream terbaik...")
         cmd = [
             sys.executable, "-m", "yt_dlp",
             "-f", format_selector,
             "-o", downloaded,
             "--merge-output-format", "mp4",
             "--no-check-certificate",
-            "--extractor-args", "youtube:player_client=android",
-            "--user-agent", "Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 Chrome/90.0.4430.91 Mobile Safari/537.36",
+            "--extractor-args", "youtube:player_client=web,default",
         ]
         if COOKIES_FILE:
             cmd.extend(["--cookies", COOKIES_FILE])
