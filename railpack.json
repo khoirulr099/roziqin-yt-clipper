@@ -1,5 +1,13 @@
 {
+  "$schema": "https://schema.railpack.com",
   "deploy": {
-    "aptPackages": ["ffmpeg"]
+    "aptPackages": [
+      "ffmpeg",
+      "libcublas-12-4",
+      "libgomp1",
+      "libopenblas0",
+      "liblapack3",
+      "libgfortran5"
+    ]
   }
 }
