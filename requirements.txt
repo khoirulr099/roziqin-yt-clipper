@@ -1,5 +1,8 @@
 streamlit
-yt-dlp
+yt-dlp[default]
 auto-editor
 faster-whisper
 python-dotenv
+torch
+torchvision
+torchaudio
