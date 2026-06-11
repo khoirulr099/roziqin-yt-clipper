@@ -122,7 +122,7 @@ if st.button("🚀 Start Processing", type="primary"):
     # Download
     st.info(f"📥 Downloading ({quality_choice})...")
 
-    # Konfigurasi YDL Options yang sudah diperbarui (tanpa cookie)
+    # Konfigurasi YDL Options dengan dukungan cookies.txt
     ydl_opts = {
         "format": format_selector,
         "outtmpl": "downloads/%(title)s.%(ext)s",
@@ -145,10 +145,14 @@ if st.button("🚀 Start Processing", type="primary"):
         "extractor_args": {
             "youtube": {
                 "player_client": ["web", "mweb"],
-                "player_skip": [], # Jangan skip js/configs agar deteksi player berjalan
+                "player_skip": [],
             }
         },
     }
+
+    # Tambahkan cookies kalau file cookies.txt ada
+    if os.path.exists("cookies.txt"):
+        ydl_opts["cookiefile"] = "cookies.txt"
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
