@@ -345,99 +345,44 @@ if st.session_state.get("clips_data"):
     st.markdown("---")
     st.subheader("🎥 Preview & Download")
 
-    # CSS: paksa video player jadi portrait 9:16
     st.markdown("""
     <style>
-    /* Portrait 9:16 container untuk setiap clip */
-    .tiktok-grid {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-        margin-top: 8px;
-    }
-    .tiktok-card {
-        flex: 1 1 calc(20% - 12px);
-        min-width: 140px;
-        max-width: 200px;
-        background: #111122;
-        border: 1px solid #2e2e4e;
-        border-radius: 10px;
-        overflow: hidden;
-        display: flex;
-        flex-direction: column;
-    }
-    /* Wrapper 9:16 aspect ratio untuk video */
-    .video-wrapper {
-        position: relative;
-        width: 100%;
-        padding-top: 177.78%;  /* 16/9 * 100 = portrait ratio */
-        background: #000;
-        overflow: hidden;
-    }
-    .video-wrapper video,
-    .video-wrapper iframe,
-    .video-wrapper > div {
-        position: absolute !important;
-        top: 0 !important;
-        left: 0 !important;
-        width: 100% !important;
-        height: 100% !important;
-        object-fit: cover !important;
-    }
-    .clip-label {
-        padding: 6px 8px 2px;
-        font-size: 0.72rem;
-        color: #aaa;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .clip-size {
-        padding: 0 8px 6px;
-        font-size: 0.68rem;
-        color: #666;
-    }
-
-    /* Override Streamlit video element biar fit ke wrapper */
+    /* Paksa semua stVideo jadi portrait 9:16 */
     [data-testid="stVideo"] {
-        margin: 0 !important;
-        padding: 0 !important;
+        aspect-ratio: 9/16 !important;
+        width: 100% !important;
+        overflow: hidden !important;
+        background: #000 !important;
+        border-radius: 8px !important;
+        margin-bottom: 4px !important;
     }
     [data-testid="stVideo"] video {
         width: 100% !important;
         height: 100% !important;
         object-fit: cover !important;
-        border-radius: 0 !important;
+        border-radius: 8px !important;
+    }
+    /* Kurangi padding kolom biar muat 5 */
+    [data-testid="column"] {
+        padding: 0 4px !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
     data_list = st.session_state.clips_data
-
-    # Selalu 5 kolom (sama persis kayak screenshot)
     ncols = 5
     cols = st.columns(ncols)
 
     for i, data in enumerate(data_list):
         with cols[i % ncols]:
-            # Label nama file
-            st.markdown(f'<div class="clip-label">**{data["name"]}**</div>', unsafe_allow_html=True)
+            # Nama file — pakai st.caption bukan markdown biar nggak ada asterisk
+            st.caption(data["name"])
 
-            # Video dalam wrapper portrait
-            st.markdown('<div class="video-wrapper">', unsafe_allow_html=True)
             if data['size_mb'] <= 100:
                 st.video(data["bytes"], format="video/mp4")
             else:
-                st.markdown(
-                    f'<div style="position:absolute;top:0;left:0;width:100%;height:100%;'
-                    f'display:flex;align-items:center;justify-content:center;'
-                    f'background:#1a1a1a;color:#888;font-size:0.7rem;text-align:center;">'
-                    f'⚠️ {data["size_mb"]}MB<br>Terlalu besar<br>untuk preview</div>',
-                    unsafe_allow_html=True
-                )
-            st.markdown('</div>', unsafe_allow_html=True)
+                st.warning(f"⚠️ {data['size_mb']}MB\nTerlalu besar untuk preview")
 
-            # Download button
             st.download_button(
                 label=f"⬇️ Download {i+1}",
                 data=data["bytes"],
