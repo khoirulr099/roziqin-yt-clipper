@@ -55,7 +55,7 @@ def clip_video(src, out, start, duration):
 def convert_vertical(src, out):
     ok, err = run_ffmpeg([
         "ffmpeg", "-y", "-i", src,
-        "-vf", "scale='if(gte(iw/ih,9/16),1080,trunc(oh*a/2)*2)':'if(gte(iw/ih,9/16),trunc(ow/a/2)*2,1920)',crop=1080:1920",
+        "-vf", "scale=-1:1920,crop=1080:1920",
         "-c:v", "libx264", "-preset", "fast", "-crf", "26",
         "-c:a", "aac", "-b:a", "128k",
         "-movflags", "+faststart",
@@ -67,7 +67,7 @@ def convert_tracking(src, out):
     """Auto tracking: center-crop following motion using ffmpeg deshake+crop"""
     ok, err = run_ffmpeg([
         "ffmpeg", "-y", "-i", src,
-        "-vf", "deshake,scale='if(gte(iw/ih,9/16),1080,trunc(oh*a/2)*2)':'if(gte(iw/ih,9/16),trunc(ow/a/2)*2,1920)',crop=1080:1920",
+        "-vf", "deshake,scale=-1:1920,crop=1080:1920",
         "-c:v", "libx264", "-preset", "fast", "-crf", "26",
         "-c:a", "aac", "-b:a", "128k",
         "-movflags", "+faststart",
@@ -196,7 +196,7 @@ if st.button("🚀 Start Processing", type="primary", use_container_width=True):
 
     with st.status("📥 Downloading video...", expanded=True) as dl_status:
         cmd = [
-            "yt-dlp",
+            sys.executable, "-m", "yt_dlp",
             "-f", format_selector,
             "-o", downloaded,
             "--merge-output-format", "mp4",
