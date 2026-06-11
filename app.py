@@ -122,24 +122,14 @@ if st.button("🚀 Start Processing", type="primary"):
     # Download
     st.info(f"📥 Downloading ({quality_choice})...")
 
-    # Write cookies dari Streamlit Secrets ke file sementara
-    cookies_path = None
-    try:
-        if "youtube" in st.secrets and "cookies" in st.secrets["youtube"]:
-            cookies_path = "/tmp/yt_cookies.txt"
-            with open(cookies_path, "w") as f:
-                f.write(st.secrets["youtube"]["cookies"])
-    except Exception:
-        pass
-
+    # Konfigurasi YDL Options yang sudah diperbarui (tanpa cookie)
     ydl_opts = {
         "format": format_selector,
         "outtmpl": "downloads/%(title)s.%(ext)s",
         "merge_output_format": "mp4",
-        "cookiefile": cookies_path,
         "http_headers": {
-            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.5",
             "Accept-Encoding": "gzip, deflate, br",
             "Referer": "https://www.youtube.com/",
@@ -150,15 +140,16 @@ if st.button("🚀 Start Processing", type="primary"):
         },
         "nocheckcertificate": True,
         "quiet": False,
-        "no_warnings": True,
-        "sleep_interval_requests": 1,
+        "no_warnings": False,
+        "sleep_interval_requests": 2,
         "extractor_args": {
             "youtube": {
-                "player_client": ["ios", "android", "web_safari", "mweb"],
-                "player_skip": ["configs", "js"],
+                "player_client": ["web", "mweb"],
+                "player_skip": [], # Jangan skip js/configs agar deteksi player berjalan
             }
         },
     }
+    
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
