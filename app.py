@@ -2,6 +2,7 @@ import os
 import sys
 import subprocess
 import json
+import tempfile  # <-- Import tambahan untuk menangani cookies di Cloud
 from pathlib import Path
 
 # Force upgrade yt-dlp BEFORE importing (penting untuk Streamlit Cloud)
@@ -144,15 +145,26 @@ if st.button("🚀 Start Processing", type="primary"):
         "sleep_interval_requests": 2,
         "extractor_args": {
             "youtube": {
-                "player_client": ["web", "mweb"],
+                "player_client": ["web", "mweb", "android", "tv"],
                 "player_skip": [],
             }
         },
     }
 
-    # Tambahkan cookies kalau file cookies.txt ada
-    if os.path.exists("cookies.txt"):
+    # --- INTEGRASI COOKIES (CLOUD & LOKAL) ---
+    cookies_path = None
+    
+    # Prioritas 1: Ambil dari Streamlit Secrets (Untuk di Cloud)
+    if "youtube" in st.secrets and "cookies" in st.secrets["youtube"]:
+        fd, cookies_path = tempfile.mkstemp(suffix=".txt")
+        with os.fdopen(fd, 'w') as f:
+            f.write(st.secrets["youtube"]["cookies"])
+        ydl_opts["cookiefile"] = cookies_path
+        
+    # Prioritas 2: Ambil dari file lokal (Untuk ngetes di laptop)
+    elif os.path.exists("cookies.txt"):
         ydl_opts["cookiefile"] = "cookies.txt"
+    # ----------------------------------------
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -161,6 +173,10 @@ if st.button("🚀 Start Processing", type="primary"):
     except Exception as e:
         st.error(f"Download failed: {e}")
         st.stop()
+    finally:
+        # PENTING: Hapus file cookies sementara setelah selesai (Hanya jika pakai tempfile)
+        if cookies_path and os.path.exists(cookies_path):
+            os.remove(cookies_path)
 
     clips = []
 
