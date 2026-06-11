@@ -8,7 +8,6 @@ downloads/
 *.srt
 *.ass
 *.vtt
-*.json
 
 # Python
 __pycache__/
@@ -57,3 +56,4 @@ nul
 cookies.txt
 cookies/
 last_chat_id.txt
+users.json
