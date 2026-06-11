@@ -113,12 +113,17 @@ if st.button("🚀 Start Processing", type="primary"):
 
     try:
         cmd = [
-            sys.executable, "-m", "yt_dlp",
+            "yt-dlp",
             "-f", f"bestvideo[height<={height}]+bestaudio/best",
             "-o", downloaded,
             "--merge-output-format", "mp4",
-            "--no-check-certificate",
+            "--js-runtime", "deno",
+            "--socket-timeout", "30",
+            "--sleep-requests", "2",
+            "--sleep-interval", "5",
+            "--extractor-args", "youtube:player_client=web",
             "--user-agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+            "--no-warnings",
             url
         ]
         result = subprocess.run(cmd, capture_output=True, text=True)
