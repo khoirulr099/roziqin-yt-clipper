@@ -67,7 +67,7 @@ def convert_tracking(src, out):
     """Auto tracking: center-crop following motion using ffmpeg deshake+crop"""
     ok, err = run_ffmpeg([
         "ffmpeg", "-y", "-i", src,
-        "-vf", "deshake,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
+        "-vf", "deshake=0,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
         "-c:v", "libx264", "-preset", "fast", "-crf", "26",
         "-c:a", "aac", "-b:a", "128k",
         "-movflags", "+faststart",
@@ -189,9 +189,10 @@ if st.button("🚀 Start Processing", type="primary", use_container_width=True):
     downloaded = "downloads/original.mp4"
 
     format_selector = (
-        f"bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]"
+        f"bestvideo[height={height}][ext=mp4]+bestaudio[ext=m4a]"
+        f"/bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]"
+        f"/best[height={height}][ext=mp4]"
         f"/best[height<={height}][ext=mp4]"
-        f"/best[height<={height}]"
     )
 
     with st.status("📥 Downloading video...", expanded=True) as dl_status:
