@@ -3,12 +3,7 @@ import sys
 import subprocess
 from pathlib import Path
 
-# Force upgrade pytubefix BEFORE importing (Penting untuk Streamlit Cloud)
-subprocess.run([sys.executable, "-m", "pip", "install", "-U", "pytubefix"], 
-               capture_output=True)
-
 import streamlit as st
-from pytubefix import YouTube
 
 from analyzer import suggest_moments
 
@@ -33,7 +28,6 @@ if mode != "Manual Mode":
             target_duration = st.number_input("Custom Duration (seconds)", 5, 300, 45, 5)
         else:
             target_duration = int(duration_choice.replace("s", ""))
-
     with col2:
         number_of_clips = st.slider("Number of Clips", 1, 5, 5)
 else:
@@ -111,45 +105,30 @@ if st.button("🚀 Start Processing", type="primary"):
         except:
             pass
 
-    # Download via PyTubeFix
-    st.info(f"📥 Downloading ({quality_choice}) with PyTubeFix...")
-    
+    # ==================== DOWNLOAD WITH YT-DLP ====================
+    st.info(f"📥 Downloading ({quality_choice}) with yt-dlp...")
+
+    downloaded = "downloads/final_video.mp4"
+    height = quality_choice.replace("p", "")
+
     try:
-        # Menggunakan client ANDROID sangat ampuh untuk bypass bot detection saat ini
-        yt = YouTube(url, client='ANDROID')
-        
-        # Cari stream video berdasarkan resolusi yang diminta
-        stream = yt.streams.filter(res=quality_choice, file_extension='mp4').first()
-        
-        # Jika resolusi spesifik (misal 1080p) tidak tersedia di versi progressive, 
-        # ambil resolusi tertinggi yang aman
-        if not stream:
-            stream = yt.streams.get_highest_resolution()
+        cmd = [
+            sys.executable, "-m", "yt_dlp",
+            "-f", f"bestvideo[height<={height}]+bestaudio/best",
+            "-o", downloaded,
+            "--merge-output-format", "mp4",
+            "--no-check-certificate",
+            "--user-agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+            url
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
 
-        # Mulai download video
-        raw_video_path = stream.download(output_path="downloads", filename="raw_video.mp4")
-        downloaded = "downloads/final_video.mp4"
-
-        # YouTube memisahkan file video dan audio untuk resolusi tinggi (DASH streams).
-        # Jika stream ini tidak punya suara, kita download audionya lalu gabung pakai FFmpeg.
-        if not stream.includes_audio_track:
-            st.info("🔄 Merging High Quality Audio & Video...")
-            audio_stream = yt.streams.get_audio_only()
-            raw_audio_path = audio_stream.download(output_path="downloads", filename="raw_audio.mp4")
-            
-            # Proses merging video bisu + file audio
-            subprocess.run(["ffmpeg", "-y", "-i", raw_video_path, "-i", raw_audio_path, 
-                            "-c:v", "copy", "-c:a", "aac", downloaded], capture_output=True)
-            
-            # Hapus file mentahan setelah digabung
-            if os.path.exists(raw_video_path): os.remove(raw_video_path)
-            if os.path.exists(raw_audio_path): os.remove(raw_audio_path)
-        else:
-            # Jika sudah punya audio (kualitas 720p ke bawah), tinggal rename
-            os.rename(raw_video_path, downloaded)
+        if result.returncode != 0:
+            st.error(f"yt-dlp failed: {result.stderr}")
+            st.stop()
 
     except Exception as e:
-        st.error(f"PyTubeFix Download failed: {e}")
+        st.error(f"Download failed: {e}")
         st.stop()
 
     clips = []
