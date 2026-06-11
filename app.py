@@ -55,7 +55,7 @@ def clip_video(src, out, start, duration):
 def convert_vertical(src, out):
     ok, err = run_ffmpeg([
         "ffmpeg", "-y", "-i", src,
-        "-vf", "scale=-1:1920,crop=1080:1920",
+        "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
         "-c:v", "libx264", "-preset", "fast", "-crf", "26",
         "-c:a", "aac", "-b:a", "128k",
         "-movflags", "+faststart",
@@ -67,7 +67,7 @@ def convert_tracking(src, out):
     """Auto tracking: center-crop following motion using ffmpeg deshake+crop"""
     ok, err = run_ffmpeg([
         "ffmpeg", "-y", "-i", src,
-        "-vf", "deshake,scale=-1:1920,crop=1080:1920",
+        "-vf", "deshake,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
         "-c:v", "libx264", "-preset", "fast", "-crf", "26",
         "-c:a", "aac", "-b:a", "128k",
         "-movflags", "+faststart",
