@@ -39,13 +39,27 @@ def is_valid_video(path):
     )
     return result.returncode == 0 and "duration" in result.stdout
 
+def get_video_resolution(path):
+    """Return (width, height) of video"""
+    result = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0",
+         "-show_entries", "stream=width,height",
+         "-of", "csv=p=0", path],
+        capture_output=True, text=True
+    )
+    try:
+        w, h = result.stdout.strip().split(",")
+        return int(w), int(h)
+    except:
+        return 0, 0
+
 def clip_video(src, out, start, duration):
     ok, err = run_ffmpeg([
         "ffmpeg", "-y",
         "-ss", str(start),
         "-i", src,
         "-t", str(duration),
-        "-c:v", "libx264", "-preset", "fast", "-crf", "26",
+        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
         "-c:a", "aac", "-b:a", "128k",
         "-movflags", "+faststart",
         out
@@ -56,7 +70,7 @@ def convert_vertical(src, out):
     ok, err = run_ffmpeg([
         "ffmpeg", "-y", "-i", src,
         "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
-        "-c:v", "libx264", "-preset", "fast", "-crf", "26",
+        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
         "-c:a", "aac", "-b:a", "128k",
         "-movflags", "+faststart",
         out
@@ -64,16 +78,37 @@ def convert_vertical(src, out):
     return ok, err
 
 def convert_tracking(src, out):
-    """Auto tracking: center-crop following motion using ffmpeg deshake+crop"""
     ok, err = run_ffmpeg([
         "ffmpeg", "-y", "-i", src,
-        "-vf", "deshake=0,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
-        "-c:v", "libx264", "-preset", "fast", "-crf", "26",
+        "-vf", "deshake,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
+        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
         "-c:a", "aac", "-b:a", "128k",
         "-movflags", "+faststart",
         out
     ])
     return ok, err
+
+# ==================== FORMAT SELECTOR ====================
+def build_format_selector(quality):
+    """
+    Build yt-dlp format string yang bener-bener sesuai kualitas pilihan.
+    Priority: exact height mp4 → max height mp4 → fallback best
+    """
+    h = quality.replace("p", "")
+    return (
+        # Priority 1: exact height, mp4 video + m4a audio
+        f"bestvideo[height={h}][ext=mp4]+bestaudio[ext=m4a]"
+        # Priority 2: max height <= pilihan, mp4 + m4a
+        f"/bestvideo[height<={h}][ext=mp4]+bestaudio[ext=m4a]"
+        # Priority 3: exact height, any format → merge to mp4
+        f"/bestvideo[height={h}]+bestaudio"
+        # Priority 4: max height <= pilihan, any format
+        f"/bestvideo[height<={h}]+bestaudio"
+        # Fallback: single file best quality <= height
+        f"/best[height<={h}]"
+        # Last resort
+        f"/best"
+    )
 
 # ==================== PAGE CONFIG ====================
 st.set_page_config(page_title="Roziqin YT Clipper", layout="wide", page_icon="✂️")
@@ -84,7 +119,6 @@ st.markdown("""
 html, body, [class*="css"] { font-family: 'Space Grotesk', sans-serif; }
 .stButton > button { border-radius: 8px; font-weight: 600; transition: transform 0.15s; }
 .stButton > button:hover { transform: translateY(-1px); }
-.clip-card { background: #1a1a2e; border: 1px solid #2e2e4e; border-radius: 10px; padding: 0.8rem; margin-bottom: 0.5rem; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -185,17 +219,12 @@ if st.button("🚀 Start Processing", type="primary", use_container_width=True):
         except: pass
 
     # ── DOWNLOAD ──
-    height = quality_choice.replace("p", "")
     downloaded = "downloads/original.mp4"
-
-    format_selector = (
-        f"bestvideo[height={height}][ext=mp4]+bestaudio[ext=m4a]"
-        f"/bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]"
-        f"/best[height={height}][ext=mp4]"
-        f"/best[height<={height}][ext=mp4]"
-    )
+    format_selector = build_format_selector(quality_choice)
 
     with st.status("📥 Downloading video...", expanded=True) as dl_status:
+        st.write(f"Format: `{quality_choice}` — mencari stream terbaik...")
+
         cmd = [
             sys.executable, "-m", "yt_dlp",
             "-f", format_selector,
@@ -213,10 +242,10 @@ if st.button("🚀 Start Processing", type="primary", use_container_width=True):
 
         if result.returncode != 0:
             dl_status.update(label="❌ Download gagal", state="error")
-            st.error(f"yt-dlp error:\n```\n{result.stderr[-600:]}\n```")
+            st.error(f"yt-dlp error:\n```\n{result.stderr[-800:]}\n```")
             st.stop()
 
-        # Cari file hasil download (Railway kadang rename)
+        # Cari file hasil download
         candidates = list(Path("downloads").glob("original*"))
         if not candidates:
             candidates = list(Path("downloads").glob("*.mp4"))
@@ -233,7 +262,16 @@ if st.button("🚀 Start Processing", type="primary", use_container_width=True):
             st.stop()
 
         size_mb = os.path.getsize(downloaded) / 1024 / 1024
-        dl_status.update(label=f"✅ Download selesai ({size_mb:.1f} MB)", state="complete")
+        w, h = get_video_resolution(downloaded)
+        dl_status.update(
+            label=f"✅ Download selesai — {w}x{h} ({size_mb:.1f} MB)",
+            state="complete"
+        )
+        # Tampilkan resolusi aktual vs yang diminta
+        requested_h = int(quality_choice.replace("p", ""))
+        if h != requested_h:
+            st.info(f"ℹ️ YouTube tidak punya stream {quality_choice} untuk video ini, "
+                    f"didownload resolusi terdekat: {w}x{h}")
 
     # ── CLIPPING ──
     clips = []
@@ -241,7 +279,6 @@ if st.button("🚀 Start Processing", type="primary", use_container_width=True):
 
     with st.status("✂️ Membuat clips...", expanded=True) as clip_status:
 
-        # AI Suggested Moments
         if mode == "AI Suggested Moments":
             try:
                 from analyzer import suggest_moments
@@ -256,13 +293,12 @@ if st.button("🚀 Start Processing", type="primary", use_container_width=True):
                     else:
                         st.warning(f"Clip {i+1} gagal: {err[-200:]}")
             except ImportError:
-                st.error("❌ `analyzer.py` tidak ditemukan! Pastikan file ada di project.")
+                st.error("❌ `analyzer.py` tidak ditemukan!")
                 st.stop()
             except Exception as e:
                 st.error(f"❌ AI Analyzer error: {e}")
                 st.stop()
 
-        # Auto Generate
         elif mode == "Auto Generate":
             for i in range(number_of_clips):
                 start = i * (target_duration + 5)
@@ -274,7 +310,6 @@ if st.button("🚀 Start Processing", type="primary", use_container_width=True):
                 else:
                     st.warning(f"Clip {i+1} gagal: {err[-200:]}")
 
-        # Manual Mode
         elif mode == "Manual Mode":
             manual = st.session_state.get("manual_clips", [])
             if not manual:
@@ -291,7 +326,7 @@ if st.button("🚀 Start Processing", type="primary", use_container_width=True):
                     st.warning(f"Clip {i+1} gagal: {err[-200:]}")
 
         if not clips:
-            clip_status.update(label="❌ Semua clips gagal dibuat", state="error")
+            clip_status.update(label="❌ Semua clips gagal", state="error")
             st.error("Tidak ada clip yang berhasil. Cek error di atas.")
             st.stop()
 
@@ -316,7 +351,7 @@ if st.button("🚀 Start Processing", type="primary", use_container_width=True):
                     except: pass
                 else:
                     st.warning(f"Convert gagal untuk {Path(c).name}, pakai versi horizontal.\n{err[-200:]}")
-                    final.append(c)  # fallback ke horizontal
+                    final.append(c)
 
             clips = final
             vtk_status.update(label=f"✅ Converted {len(clips)} clips", state="complete")
@@ -326,14 +361,15 @@ if st.button("🚀 Start Processing", type="primary", use_container_width=True):
     for clip in clips:
         if os.path.exists(clip):
             size_mb = round(os.path.getsize(clip) / 1024 / 1024, 1)
+            w, h = get_video_resolution(clip)
             with open(clip, "rb") as f:
                 st.session_state.clips_data.append({
                     "name": Path(clip).name,
                     "bytes": f.read(),
-                    "size_mb": size_mb
+                    "size_mb": size_mb,
+                    "resolution": f"{w}x{h}"
                 })
 
-    # Clean downloads
     for f in Path("downloads").glob("*"):
         try: f.unlink()
         except: pass
@@ -348,7 +384,6 @@ if st.session_state.get("clips_data"):
 
     st.markdown("""
     <style>
-    /* Paksa semua stVideo jadi portrait 9:16 */
     [data-testid="stVideo"] {
         aspect-ratio: 9/16 !important;
         width: 100% !important;
@@ -363,7 +398,6 @@ if st.session_state.get("clips_data"):
         object-fit: cover !important;
         border-radius: 8px !important;
     }
-    /* Kurangi padding kolom biar muat 5 */
     [data-testid="column"] {
         padding: 0 4px !important;
     }
@@ -376,13 +410,13 @@ if st.session_state.get("clips_data"):
 
     for i, data in enumerate(data_list):
         with cols[i % ncols]:
-            # Nama file — pakai st.caption bukan markdown biar nggak ada asterisk
-            st.caption(data["name"])
+            st.caption(f"{data['name']}")
+            st.caption(f"📦 {data['size_mb']} MB · 🎬 {data.get('resolution', '-')}")
 
             if data['size_mb'] <= 100:
                 st.video(data["bytes"], format="video/mp4")
             else:
-                st.warning(f"⚠️ {data['size_mb']}MB\nTerlalu besar untuk preview")
+                st.warning(f"⚠️ {data['size_mb']}MB — terlalu besar untuk preview")
 
             st.download_button(
                 label=f"⬇️ Download {i+1}",
