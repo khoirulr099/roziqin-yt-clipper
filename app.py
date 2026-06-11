@@ -1,16 +1,14 @@
 import os
 import sys
 import subprocess
-import json
-import tempfile  # <-- Import tambahan untuk menangani cookies di Cloud
 from pathlib import Path
 
-# Force upgrade yt-dlp BEFORE importing (penting untuk Streamlit Cloud)
-subprocess.run([sys.executable, "-m", "pip", "install", "-U", "yt-dlp"], 
+# Force upgrade pytubefix BEFORE importing (Penting untuk Streamlit Cloud)
+subprocess.run([sys.executable, "-m", "pip", "install", "-U", "pytubefix"], 
                capture_output=True)
 
 import streamlit as st
-import yt_dlp
+from pytubefix import YouTube
 
 from analyzer import suggest_moments
 
@@ -44,13 +42,6 @@ else:
 
 # Quality
 quality_choice = st.selectbox("Quality", ["360p", "480p", "720p", "1080p"], index=2)
-QUALITY_MAP = {
-    "360p": "bestvideo[height<=360]+bestaudio/best[height<=360]",
-    "480p": "bestvideo[height<=480]+bestaudio/best[height<=480]",
-    "720p": "bestvideo[height<=720]+bestaudio/best[height<=720]",
-    "1080p": "bestvideo[height<=1080]+bestaudio/best[height<=1080]",
-}
-format_selector = QUALITY_MAP[quality_choice]
 
 # Other options
 col_a, col_b = st.columns(2)
@@ -120,63 +111,46 @@ if st.button("🚀 Start Processing", type="primary"):
         except:
             pass
 
-    # Download
-    st.info(f"📥 Downloading ({quality_choice})...")
-
-    # Konfigurasi YDL Options dengan dukungan cookies.txt
-    ydl_opts = {
-        "format": format_selector,
-        "outtmpl": "downloads/%(title)s.%(ext)s",
-        "merge_output_format": "mp4",
-        "http_headers": {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.5",
-            "Accept-Encoding": "gzip, deflate, br",
-            "Referer": "https://www.youtube.com/",
-            "Origin": "https://www.youtube.com",
-            "Sec-Fetch-Dest": "empty",
-            "Sec-Fetch-Mode": "cors",
-            "Sec-Fetch-Site": "same-origin",
-        },
-        "nocheckcertificate": True,
-        "quiet": False,
-        "no_warnings": False,
-        "sleep_interval_requests": 2,
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["web", "mweb", "android", "tv"],
-                "player_skip": [],
-            }
-        },
-    }
-
-    # --- INTEGRASI COOKIES (CLOUD & LOKAL) ---
-    cookies_path = None
-    
-    # Prioritas 1: Ambil dari Streamlit Secrets (Untuk di Cloud)
-    if "youtube" in st.secrets and "cookies" in st.secrets["youtube"]:
-        fd, cookies_path = tempfile.mkstemp(suffix=".txt")
-        with os.fdopen(fd, 'w') as f:
-            f.write(st.secrets["youtube"]["cookies"])
-        ydl_opts["cookiefile"] = cookies_path
-        
-    # Prioritas 2: Ambil dari file lokal (Untuk ngetes di laptop)
-    elif os.path.exists("cookies.txt"):
-        ydl_opts["cookiefile"] = "cookies.txt"
-    # ----------------------------------------
+    # Download via PyTubeFix
+    st.info(f"📥 Downloading ({quality_choice}) with PyTubeFix...")
     
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            downloaded = ydl.prepare_filename(info)
+        # Menggunakan client ANDROID sangat ampuh untuk bypass bot detection saat ini
+        yt = YouTube(url, client='ANDROID')
+        
+        # Cari stream video berdasarkan resolusi yang diminta
+        stream = yt.streams.filter(res=quality_choice, file_extension='mp4').first()
+        
+        # Jika resolusi spesifik (misal 1080p) tidak tersedia di versi progressive, 
+        # ambil resolusi tertinggi yang aman
+        if not stream:
+            stream = yt.streams.get_highest_resolution()
+
+        # Mulai download video
+        raw_video_path = stream.download(output_path="downloads", filename="raw_video.mp4")
+        downloaded = "downloads/final_video.mp4"
+
+        # YouTube memisahkan file video dan audio untuk resolusi tinggi (DASH streams).
+        # Jika stream ini tidak punya suara, kita download audionya lalu gabung pakai FFmpeg.
+        if not stream.includes_audio_track:
+            st.info("🔄 Merging High Quality Audio & Video...")
+            audio_stream = yt.streams.get_audio_only()
+            raw_audio_path = audio_stream.download(output_path="downloads", filename="raw_audio.mp4")
+            
+            # Proses merging video bisu + file audio
+            subprocess.run(["ffmpeg", "-y", "-i", raw_video_path, "-i", raw_audio_path, 
+                            "-c:v", "copy", "-c:a", "aac", downloaded], capture_output=True)
+            
+            # Hapus file mentahan setelah digabung
+            if os.path.exists(raw_video_path): os.remove(raw_video_path)
+            if os.path.exists(raw_audio_path): os.remove(raw_audio_path)
+        else:
+            # Jika sudah punya audio (kualitas 720p ke bawah), tinggal rename
+            os.rename(raw_video_path, downloaded)
+
     except Exception as e:
-        st.error(f"Download failed: {e}")
+        st.error(f"PyTubeFix Download failed: {e}")
         st.stop()
-    finally:
-        # PENTING: Hapus file cookies sementara setelah selesai (Hanya jika pakai tempfile)
-        if cookies_path and os.path.exists(cookies_path):
-            os.remove(cookies_path)
 
     clips = []
 
